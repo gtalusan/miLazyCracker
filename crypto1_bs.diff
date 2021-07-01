@@ -1,8 +1,92 @@
+diff --git a/crypto1_bs.c b/crypto1_bs.c
+index c9c902a..a35b0b6 100644
+--- a/crypto1_bs.c
++++ b/crypto1_bs.c
+@@ -34,6 +34,9 @@ THE SOFTWARE.
+ __thread bitslice_t states[KEYSTREAM_SIZE+STATE_SIZE];
+ __thread bitslice_t * restrict state_p;
+ 
++bitslice_t bs_ones;
++bitslice_t bs_zeroes;
++
+ void crypto1_bs_init(){
+     // initialize constant one and zero bit vectors
+     memset(bs_ones.bytes, 0xff, VECTOR_SIZE);
+diff --git a/crypto1_bs.h b/crypto1_bs.h
+index 8f33274..7aa3c24 100644
+--- a/crypto1_bs.h
++++ b/crypto1_bs.h
+@@ -47,8 +47,8 @@ f20c(f20a((s[47- 9].value), (s[47-11].value), (s[47-13].value), (s[47-15].value)
+ #define get_vector_bit(slice, value) get_bit(slice&0x3f, value.bytes64[slice>>6])
+ 
+ // constant ones/zeroes
+-bitslice_t bs_ones;
+-bitslice_t bs_zeroes;
++extern bitslice_t bs_ones;
++extern bitslice_t bs_zeroes;
+ 
+ // size of crypto-1 state
+ #define STATE_SIZE 48
+diff --git a/crypto1_bs_crack.c b/crypto1_bs_crack.c
+index 176b50f..4ad6495 100644
+--- a/crypto1_bs_crack.c
++++ b/crypto1_bs_crack.c
+@@ -28,6 +28,13 @@ THE SOFTWARE.
+ #endif
+ #include "crypto1_bs_crack.h"
+ 
++// arrays of bitsliced states with identical values in all slices
++bitslice_t bitsliced_encrypted_nonces[NONCE_TESTS][STATE_SIZE];
++bitslice_t bitsliced_encrypted_parity_bits[NONCE_TESTS][STATE_SIZE];
++bitslice_t bitsliced_rollback_byte[ROLLBACK_SIZE];
++size_t keys_found;
++uint64_t total_states_tested;
++
+ inline uint64_t crack_states_bitsliced(uint32_t **task){
+     // the idea to roll back the half-states before combining them was suggested/explained to me by bla
+     // first we pre-bitslice all the even state bits and roll them back, then bitslice the odd bits and combine the two in the inner loop
+diff --git a/crypto1_bs_crack.h b/crypto1_bs_crack.h
+index db9e1c7..1efc146 100644
+--- a/crypto1_bs_crack.h
++++ b/crypto1_bs_crack.h
+@@ -4,9 +4,9 @@
+ #include "crypto1_bs.h"
+ #include "craptev1.h"
+ uint64_t crack_states_bitsliced(uint32_t **task);
+-size_t keys_found;
+-uint64_t total_states_tested;
+-uint64_t total_states;
++extern size_t keys_found;
++extern uint64_t total_states_tested;
++extern uint64_t total_states;
+ 
+ // linked from crapto1.c file
+ extern uint8_t lfsr_rollback_byte(uint64_t* s, uint32_t in, int fb);
+@@ -15,8 +15,8 @@ extern uint8_t lfsr_rollback_byte(uint64_t* s, uint32_t in, int fb);
+ #define EXACT_COUNT
+ 
+ // arrays of bitsliced states with identical values in all slices
+-bitslice_t bitsliced_encrypted_nonces[NONCE_TESTS][STATE_SIZE];
+-bitslice_t bitsliced_encrypted_parity_bits[NONCE_TESTS][STATE_SIZE];
+-bitslice_t bitsliced_rollback_byte[ROLLBACK_SIZE];
++extern bitslice_t bitsliced_encrypted_nonces[NONCE_TESTS][STATE_SIZE];
++extern bitslice_t bitsliced_encrypted_parity_bits[NONCE_TESTS][STATE_SIZE];
++extern bitslice_t bitsliced_rollback_byte[ROLLBACK_SIZE];
+ 
+ #endif // _CRYPTO1_BS_CRACK_H
 diff --git a/libnfc_crypto1_crack.c b/libnfc_crypto1_crack.c
-index 2015dcb..0fa7436 100755
+index 2015dcb..412d86e 100755
 --- a/libnfc_crypto1_crack.c
 +++ b/libnfc_crypto1_crack.c
-@@ -730,6 +730,17 @@ int main (int argc, const char * argv[]) {
+@@ -300,6 +300,7 @@ extern uint32_t crypto1_word(uint64_t *, uint32_t, int);
+ extern uint8_t crypto1_byte(uint64_t*, uint8_t, int);
+ extern uint32_t prng_successor(uint32_t x, uint32_t n);
+ extern void crypto1_destroy(uint64_t*);
++uint64_t total_states;
+ 
+ #define MC_AUTH_A 0x60
+ #define MC_AUTH_B 0x61
+@@ -730,6 +731,17 @@ int main (int argc, const char * argv[]) {
          return 1;
      } else {
          printf("Found key: %012"PRIx64"\n", found_key);
@@ -20,3 +104,28 @@ index 2015dcb..0fa7436 100755
      }
      printf("Tested %"llu" states\n", total_states_tested);
  
+diff --git a/solve_bs.c b/solve_bs.c
+index bf14d9a..76475d7 100644
+--- a/solve_bs.c
++++ b/solve_bs.c
+@@ -18,6 +18,7 @@
+ 
+ uint32_t **space;
+ uint8_t thread_count = 1;
++uint64_t total_states;
+ 
+ uint64_t *readnonces(char* fname) {
+     int i, j;
+diff --git a/solve_piwi_bs.c b/solve_piwi_bs.c
+index 1d149e7..28d3bab 100644
+--- a/solve_piwi_bs.c
++++ b/solve_piwi_bs.c
+@@ -16,6 +16,8 @@
+ #define lu PRIu32
+ #define VT100_cleareol "\r\33[2K"
+ 
++uint64_t total_states;
++
+ uint64_t split(uint8_t p){
+     return (((p & 0x8) >>3 )| ((p & 0x4) >> 2) << 8 | ((p & 0x2) >> 1) << 16 | (p & 0x1) << 24 );
+ }
